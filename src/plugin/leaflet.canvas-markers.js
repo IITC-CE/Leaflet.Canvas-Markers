@@ -8,23 +8,33 @@ function layerFactory(L) {
             L.Util.stamp(this);
         },
         onAdd: function () {
-            if (!this._container) {
+            //if (!this._container) {
                 this._initContainer(); // defined by renderer implementations
 
                 if (this._zoomAnimated) {
                     L.DomUtil.addClass(this._container, 'leaflet-zoom-animated');
                 }
 
-            }
+            //} // TODO: this is temporary fix to keep container on remove
 
             this.getPane().appendChild(this._container);
             L.DomUtil.toBack(this._container);
             this._update();
+            this._updateTransform(this._center, this._zoom); // TODO: refactor all these update/redraw sequences into common functions
             this._updateCtx();
             this._draw();
         },
-        onRemove: function () {
+        onRemove_bak: function () {
             this._destroyContainer();
+        }, // TODO: this is temporary fix to keep container on remove
+        onRemove: function () {
+            this._map.off('viewreset', this._reset, this);
+            this._map.off('zoom moveend', this._redraw, this);
+            this._map.off('mousemove', this._onMouseMove, this);
+            this._map.off('click', this._onClick, this);
+            this._map.off('mouseout', this._handleMouseOut, this);
+            this._map.off('zoomanim', this._onAnimZoom, this);
+            this._container.remove();
         },
         _onAnimZoom: function (ev) {
             this._updateTransform(ev.center, ev.zoom);
@@ -37,7 +47,7 @@ function layerFactory(L) {
             return {};
         },
         _initContainer: function () {
-            var container = this._container = document.createElement('canvas');
+            var container = this._container = this._container || document.createElement('canvas'); // TODO: this is temporary fix to keep container on remove
 
             this._map.on('viewreset', this._reset, this);
             this._map.on('zoom moveend', this._redraw, this);
@@ -267,14 +277,18 @@ function layerFactory(L) {
         _searchPoints: function (point) {
             return this._markers.search({ minX: point.x, minY: point.y, maxX: point.x, maxY: point.y });
         },
-        on: function (event, func) {
+        on: function (types, fn, context) { // TODO: this is temporary fix to handle all leaflet events (not only internal)
+            var internal = ['click', 'mouseover', 'mouseout'];
             var self = this;
             if (!self._userEvents)
                 self._userEvents = {};
-            L.Util.splitWords(event).forEach(function (e) {
-                self._userEvents[e] = func;
+            L.Util.splitWords(types).forEach(function (type) {
+                if (internal.indexOf(type) === -1) {
+                    L.Evented.prototype._on.call(self, type, fn, context);
+                } else {
+                    self._userEvents[type] = fn;
+                }
             });
-
             return this;
         },
         _onClick: function (e) {
