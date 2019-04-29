@@ -97,6 +97,7 @@ function layerFactory(L) {
             }
             this._update();
             this._clear(); // clear layers in redraw bounds
+            this._updateCtx();
             this._draw(); // draw layers
 
             this._redrawBounds = null;
