@@ -2,7 +2,7 @@
 
 function layerFactory(L) {
 
-    var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
+    L.CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
         initialize: function (options) {
             L.Util.setOptions(this, options);
             L.Util.stamp(this);
@@ -590,8 +590,10 @@ function layerFactory(L) {
     });
 
     L.canvasIconLayer = function (options) {
-        return new CanvasIconLayer(options);
+        return new L.CanvasIconLayer(options);
     };
+
+    return L.CanvasIconLayer;
 };
 
 module.exports = layerFactory;
