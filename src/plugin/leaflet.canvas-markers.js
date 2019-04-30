@@ -274,8 +274,8 @@ function layerFactory(L) {
 
             this._ctx.drawImage(
                 marker.canvas_img,
-                pointPos.x - marker.options.icon.options.iconAnchor[0]-(this._topLeftOffset?this._topLeftOffset.x:0),
-                pointPos.y - marker.options.icon.options.iconAnchor[1]-(this._topLeftOffset?this._topLeftOffset.y:0),
+                pointPos.x - marker.options.icon.options.iconAnchor[0]-this._map._mapPane._leaflet_pos.x-(this._topLeftOffset?this._topLeftOffset.x:0),
+                pointPos.y - marker.options.icon.options.iconAnchor[1]-this._map._mapPane._leaflet_pos.y-(this._topLeftOffset?this._topLeftOffset.y:0),
                 marker.options.icon.options.iconSize[0],
                 marker.options.icon.options.iconSize[1]
             );
