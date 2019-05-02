@@ -272,10 +272,13 @@ function layerFactory(L) {
                 else
                     return;
 
+            var iconAnchor = L.point(marker.options.icon.options.iconAnchor);
+            var pos = this._map.containerPointToLayerPoint(pointPos.subtract(iconAnchor).subtract(this._topLeftOffset?this._topLeftOffset:L.Point(0,0)));
+
             this._ctx.drawImage(
                 marker.canvas_img,
-                pointPos.x - marker.options.icon.options.iconAnchor[0]-this._map._mapPane._leaflet_pos.x-(this._topLeftOffset?this._topLeftOffset.x:0),
-                pointPos.y - marker.options.icon.options.iconAnchor[1]-this._map._mapPane._leaflet_pos.y-(this._topLeftOffset?this._topLeftOffset.y:0),
+                pos.x,
+                pos.y,
                 marker.options.icon.options.iconSize[0],
                 marker.options.icon.options.iconSize[1]
             );
