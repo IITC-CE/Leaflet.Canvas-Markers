@@ -194,7 +194,7 @@ function layerFactory(L) {
                 tmp = [];
             }
             var mapBounds = self._map.getBounds();
-            var _pad = self.pad(mapBounds, 0.1);
+            var _pad = self.pad(mapBounds, self.options.padding);
 
             //Only re-draw what we are showing on the map.
             self._latlngMarkers.search({
