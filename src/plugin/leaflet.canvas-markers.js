@@ -46,8 +46,7 @@ function layerFactory(L) {
         _initContainer: function () {
             var container = this._container = document.createElement('canvas');
 
-            this._map.on('viewreset', this._redraw, this);
-            this._map.on('zoom moveend', this._redraw, this);
+            this._map.on('zoom moveend viewreset', this._redraw, this);
             this._map.on('mousemove', this._onMouseMove, this);
             this._map.on('click', this._onClick, this);
             this._map.on('mouseout', this._handleMouseOut, this);
@@ -108,8 +107,7 @@ function layerFactory(L) {
             delete this._markers;
             delete this._latlngMarkers;
             delete this._ctx;
-            this._map.off('viewreset', this._redraw, this);
-            this._map.off('zoom moveend', this._redraw, this);
+            this._map.off('zoom moveend viewreset', this._redraw, this); // todo: port to layers-features-back branch
             this._map.off('mousemove', this._onMouseMove, this);
             this._map.off('click', this._onClick, this);
             this._map.off('mouseout', this._handleMouseOut, this);
