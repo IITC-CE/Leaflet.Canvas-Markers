@@ -3,28 +3,45 @@
 function layerFactory(L) {
 
     var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
+        options: {
+            // @option padding: Number = 0.1
+            // How much to extend the clip area around the map view (relative to its size)
+            // e.g. 0.1 would be 10% of map view in each direction
+            padding: L.Canvas.prototype.options.padding
+        },
+
         initialize: function (options) {
             L.Util.setOptions(this, options);
             L.Util.stamp(this);
         },
         onAdd: function () {
-            if (!this._container) {
+            //if (!this._container) {
                 this._initContainer(); // defined by renderer implementations
 
                 if (this._zoomAnimated) {
                     L.DomUtil.addClass(this._container, 'leaflet-zoom-animated');
                 }
 
-            }
+            //} // TODO: this is temporary fix to keep container on remove
 
             this.getPane().appendChild(this._container);
             L.DomUtil.toBack(this._container);
             this._update();
+            this._updateTransform(this._center, this._zoom); // TODO: refactor all these update/redraw sequences into common functions
             this._updateCtx();
             this._draw();
         },
-        onRemove: function () {
+        onRemove_bak: function () {
             this._destroyContainer();
+        }, // TODO: this is temporary fix to keep container on remove
+        onRemove: function () {
+            this._map.off('viewreset', this._reset, this);
+            this._map.off('zoom moveend', this._redraw, this);
+            this._map.off('mousemove', this._onMouseMove, this);
+            this._map.off('click', this._onClick, this);
+            this._map.off('mouseout', this._handleMouseOut, this);
+            this._map.off('zoomanim', this._onAnimZoom, this);
+            this._container.remove();
         },
         _onAnimZoom: function (ev) {
             this._updateTransform(ev.center, ev.zoom);
@@ -37,10 +54,9 @@ function layerFactory(L) {
             return {};
         },
         _initContainer: function () {
-            var container = this._container = document.createElement('canvas');
+            var container = this._container = this._container || document.createElement('canvas'); // TODO: this is temporary fix to keep container on remove
 
-            this._map.on('viewreset', this._reset, this);
-            this._map.on('zoom moveend', this._redraw, this);
+            this._map.on('zoom moveend viewreset', this._redraw, this);
             this._map.on('mousemove', this._onMouseMove, this);
             this._map.on('click', this._onClick, this);
             this._map.on('mouseout', this._handleMouseOut, this);
@@ -50,17 +66,12 @@ function layerFactory(L) {
 
             this._ctx = container.getContext('2d');
         },
-        _reset: function () {
-            this._update();
-            this._updateTransform(this._center, this._zoom);
-            this._redraw();
-        },
         _updateTransform: function (center, zoom) {
             if (!this._map)
                 return;
             var scale = this._map.getZoomScale(zoom, this._zoom),
                 position = L.DomUtil.getPosition(this._container),
-                viewHalf = this._map.getSize().multiplyBy(0.5),
+                viewHalf = this._map.getSize().multiplyBy(0.5 + this.options.padding),
                 currentCenterPoint = this._map.project(this._center, zoom),
                 destCenterPoint = this._map.project(center, zoom),
                 centerOffset = destCenterPoint.subtract(currentCenterPoint)
@@ -96,7 +107,9 @@ function layerFactory(L) {
                 this._redrawBounds.max._ceil();
             }
             this._update();
+            this._updateTransform(this._center, this._zoom);
             this._clear(); // clear layers in redraw bounds
+            this._updateCtx();
             this._draw(); // draw layers
 
             this._redrawBounds = null;
@@ -105,8 +118,7 @@ function layerFactory(L) {
             delete this._markers;
             delete this._latlngMarkers;
             delete this._ctx;
-            this._map.off('viewreset', this._reset, this);
-            this._map.off('zoom moveend', this._redraw, this);
+            this._map.off('zoom moveend viewreset', this._redraw, this); // todo: port to layers-features-back branch
             this._map.off('mousemove', this._onMouseMove, this);
             this._map.off('click', this._onClick, this);
             this._map.off('mouseout', this._handleMouseOut, this);
@@ -118,7 +130,7 @@ function layerFactory(L) {
                 return;
             if (this._map._animatingZoom && this._bounds) { return; }
 
-            var p = 0,
+            var p = this.options.padding,
                 size = this._map.getSize(),
                 min = this._map.containerPointToLayerPoint(size.multiplyBy(-p)).round();
 
@@ -153,6 +165,18 @@ function layerFactory(L) {
                 this._ctx.scale(2, 2);
             }
         },
+        // @method pad(bufferRatio: Number): array
+        // Returns bounds created by extending or retracting the current bounds by a given ratio in each direction.
+        // For example, a ratio of 0.5 extends the bounds by 50% in each direction.
+        // Negative values will retract the bounds.
+        pad: function (mapBounds, bufferRatio) {
+            var sw = mapBounds._southWest,
+                ne = mapBounds._northEast,
+                heightBuffer = Math.abs(sw.lat - ne.lat) * bufferRatio,
+                widthBuffer = Math.abs(sw.lng - ne.lng) * bufferRatio;
+
+            return [widthBuffer, heightBuffer];
+        },
         _draw: function () {
             var self = this;
             //If no markers don't draw
@@ -179,13 +203,14 @@ function layerFactory(L) {
                 tmp = [];
             }
             var mapBounds = self._map.getBounds();
+            var _pad = self.pad(mapBounds, self.options.padding);
 
             //Only re-draw what we are showing on the map.
             self._latlngMarkers.search({
-                minX: mapBounds.getWest(),
-                minY: mapBounds.getSouth(),
-                maxX: mapBounds.getEast(),
-                maxY: mapBounds.getNorth()
+                minX: mapBounds.getWest()-_pad[0],
+                minY: mapBounds.getSouth()-_pad[1],
+                maxX: mapBounds.getEast()+_pad[0],
+                maxY: mapBounds.getNorth()+_pad[1]
             }).forEach(function (e) {
                 //Readjust Point Map
                 if (!e.data._map)
@@ -245,7 +270,7 @@ function layerFactory(L) {
                         });
                     }
                 }
-            } else {
+            } else if (self._imageLookup[marker.options.icon.options.iconUrl][1]) { // image may be not loaded / bad url
                 self._drawImage(marker, pointPos);
             }
         },
@@ -256,10 +281,13 @@ function layerFactory(L) {
                 else
                     return;
 
+            var iconAnchor = L.point(marker.options.icon.options.iconAnchor);
+            var pos = this._map.containerPointToLayerPoint(pointPos.subtract(iconAnchor).subtract(this._topLeftOffset?this._topLeftOffset:L.Point(0,0)));
+
             this._ctx.drawImage(
                 marker.canvas_img,
-                pointPos.x - marker.options.icon.options.iconAnchor[0],//+(this._topLeftOffset?this._topLeftOffset.x/2:0),
-                pointPos.y - marker.options.icon.options.iconAnchor[1],//+(this._topLeftOffset?this._topLeftOffset.y/2:0),
+                pos.x,
+                pos.y,
                 marker.options.icon.options.iconSize[0],
                 marker.options.icon.options.iconSize[1]
             );
@@ -267,17 +295,23 @@ function layerFactory(L) {
         _searchPoints: function (point) {
             return this._markers.search({ minX: point.x, minY: point.y, maxX: point.x, maxY: point.y });
         },
-        on: function (event, func) {
+        on: function (types, fn, context) { // TODO: this is temporary fix to handle all leaflet events (not only internal)
+            var internal = ['click', 'mouseover', 'mouseout'];
             var self = this;
             if (!self._userEvents)
                 self._userEvents = {};
-            L.Util.splitWords(event).forEach(function (e) {
-                self._userEvents[e] = func;
+            L.Util.splitWords(types).forEach(function (type) {
+                if (internal.indexOf(type) === -1) {
+                    L.Evented.prototype._on.call(self, type, fn, context);
+                } else {
+                    self._userEvents[type] = fn;
+                }
             });
-
             return this;
         },
         _onClick: function (e) {
+            if (!this._markers) { return; }
+
             var self = this;
             var point = e.containerPoint;
 
@@ -298,7 +332,7 @@ function layerFactory(L) {
             }
         },
         _onMouseMove: function (e) {
-            if (!this._map || this._map.dragging.moving() || this._map._animatingZoom) { return; }
+            if (!this._markers || this._map.dragging.moving() || this._map._animatingZoom) { return; }
 
             var point = e.containerPoint;
             this._handleMouseHover(e, point);
@@ -375,7 +409,7 @@ function layerFactory(L) {
             for (var i = 0; i < keys.length; i++) {
                 if (groupID === keys[0]) {
                     var add = true;
-                    greak;
+                    break;
                 }
             }
             if (!add)
@@ -512,7 +546,7 @@ function layerFactory(L) {
             if (marker["minX"])
                 marker = marker.data;
             var latlng = marker.getLatLng();
-            var isDisplaying = self._map.getBounds().contains(latlng);
+            var isDisplaying = self._map && self._map.getBounds().contains(latlng);
             var val = {
                 minX: latlng.lng,
                 minY: latlng.lat,
@@ -521,7 +555,7 @@ function layerFactory(L) {
                 data: marker
             };
 
-            this._removeGeneric(marker, fn);
+            this._removeGeneric(val, fn);
 
             if (isDisplaying === true && redraw === true) {
                 self._redraw();
@@ -564,7 +598,7 @@ function layerFactory(L) {
 
             var adj_x = iconSize[0] / 2;
             var adj_y = iconSize[1] / 2;
-			var anchor_y =
+
             var ret = [({
                 minX: (pointPos.x - adj_x),
                 minY: (pointPos.y - adj_y),
@@ -592,6 +626,8 @@ function layerFactory(L) {
     L.canvasIconLayer = function (options) {
         return new CanvasIconLayer(options);
     };
+
+    return CanvasIconLayer;
 };
 
 module.exports = layerFactory;
