@@ -35,8 +35,7 @@ function layerFactory(L) {
             this._destroyContainer();
         }, // TODO: this is temporary fix to keep container on remove
         onRemove: function () {
-            this._map.off('viewreset', this._reset, this);
-            this._map.off('zoom moveend', this._redraw, this);
+            this._map.off('moveend', this._redraw, this); // TODO: 'moveend' seems enough (https://github.com/IITC-CE/Leaflet.Canvas-Markers/issues/11)
             this._map.off('mousemove', this._onMouseMove, this);
             this._map.off('click', this._onClick, this);
             this._map.off('mouseout', this._handleMouseOut, this);
@@ -56,7 +55,7 @@ function layerFactory(L) {
         _initContainer: function () {
             var container = this._container = this._container || document.createElement('canvas'); // TODO: this is temporary fix to keep container on remove
 
-            this._map.on('zoom moveend viewreset', this._redraw, this);
+            this._map.on('moveend', this._redraw, this); // TODO: 'moveend' seems enough (https://github.com/IITC-CE/Leaflet.Canvas-Markers/issues/11)
             this._map.on('mousemove', this._onMouseMove, this);
             this._map.on('click', this._onClick, this);
             this._map.on('mouseout', this._handleMouseOut, this);
@@ -118,7 +117,7 @@ function layerFactory(L) {
             delete this._markers;
             delete this._latlngMarkers;
             delete this._ctx;
-            this._map.off('zoom moveend viewreset', this._redraw, this); // todo: port to layers-features-back branch
+            this._map.off('moveend', this._redraw, this);  // TODO: 'moveend' seems enough (https://github.com/IITC-CE/Leaflet.Canvas-Markers/issues/11)
             this._map.off('mousemove', this._onMouseMove, this);
             this._map.off('click', this._onClick, this);
             this._map.off('mouseout', this._handleMouseOut, this);
