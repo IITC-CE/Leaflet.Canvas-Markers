@@ -594,6 +594,8 @@ function layerFactory(L) {
     L.canvasIconLayer = function (options) {
         return new CanvasIconLayer(options);
     };
+
+    return CanvasIconLayer;
 };
 
 module.exports = layerFactory;
